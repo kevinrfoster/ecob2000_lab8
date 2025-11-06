@@ -3,77 +3,129 @@ title: "Lab 8"
 output: github_document
 ---
 
+  
 ### Econ B2000, MA Econometrics
 ### Kevin R Foster, the Colin Powell School at the City College of New York, CUNY
-### Fall 2023
+### Fall 2025
 
-This is part 3 A of a 3-part segment. Part 3 B will be the fifth part of a 3-part segment, because econometricians count good.
 
-In the last 2 weeks we estimated OLS and logit models. Last week's addendum included basics on how to create a standardized dataset split into training and test. We'll move to estimate other models in a variety of specifications.
+This is Part 2 of a 3-part series. Part 1 estimated OLS. Part 2 will estimate logit models; Part 3 will estimate fancier machine learning models. 
 
-Start with a review. Some of these machine learning techniques are very computationally intensive so we might want to split up the problems. You should convince yourselves that these estimations provide identical coefficient estimates (once properly interpreted):
+Using the same couples data as last time, for this lab we'll estimate logit and probit models instead of just OLS as we did in Lab 7. But if you use the same subgroup and same model, you can compare the predictions from each method. Look at subgroups to see if there are particular groups where the models are more confused. Look at the tradeoff of false positive vs false negative. Are there explanatory variables (features) that are consistently of little predictive value? Can you find better ones?
 
-```{r eval=FALSE}
+Are these X-variables exogenous? As you add more, think about causality.
 
-# for now, really simplify the education dummy
-dat_use$BA_plus <- dat_use$educ_college + dat_use$educ_advdeg
 
-# whole dataset
-model_lpm_v1 <- lm(public_work_num ~ female + BA_plus + AGE + I(female*BA_plus) + I(AGE * female), data = dat_use)
-summary(model_lpm_v1)
+```{r warning=FALSE, message=FALSE}
+library(ggplot2)
+library(tidyverse)
+library(haven)
 
-dat_use_female <- subset(dat_use,as.logical(dat_use$female))
-dat_use_male <- subset(dat_use,!(dat_use$female))
+setwd("..//ACS_2021_PUMS//") # your directory structure will be different
+load("ACS_2021_couples.RData")
 
-# now split into 2 parts
-model_lpm_v1f <- lm(public_work_num ~ BA_plus + AGE, data = dat_use_female)
-summary(model_lpm_v1f)
-model_lpm_v1m <- lm(public_work_num ~ BA_plus + AGE, data = dat_use_male)
-summary(model_lpm_v1m)
+```
+
+```{r echo=FALSE, message=FALSE}
+acs2021_couples$age_diff <- acs2021_couples$AGE - acs2021_couples$h_age
+acs2021_couples$educ_numeric <- fct_recode(acs2021_couples$EDUC,
+                                           "0" = "N/A or no schooling",
+                                           "2" = "Nursery school to grade 4",
+                                           "6.5" = "Grade 5, 6, 7, or 8",
+                                           "9" = "Grade 9",
+                                           "10" = "Grade 10",
+                                           "11" = "Grade 11",
+                                           "12" = "Grade 12",
+                                           "13" = "1 year of college",
+                                           "14" = "2 years of college",
+                                           "15" = "3 years of college",
+                                           "16" = "4 years of college",
+                                           "17" = "5+ years of college")
+
+acs2021_couples$educ_numeric <- as.numeric(levels(acs2021_couples$educ_numeric))[acs2021_couples$educ_numeric]
+
+acs2021_couples$h_educ_numeric <- fct_recode(acs2021_couples$h_educ,
+                                           "0" = "N/A or no schooling",
+                                           "2" = "Nursery school to grade 4",
+                                           "6.5" = "Grade 5, 6, 7, or 8",
+                                           "9" = "Grade 9",
+                                           "10" = "Grade 10",
+                                           "11" = "Grade 11",
+                                           "12" = "Grade 12",
+                                           "13" = "1 year of college",
+                                           "14" = "2 years of college",
+                                           "15" = "3 years of college",
+                                           "16" = "4 years of college",
+                                           "17" = "5+ years of college")
+
+acs2021_couples$h_educ_numeric <- as.numeric(levels(acs2021_couples$h_educ_numeric))[acs2021_couples$h_educ_numeric]
+
+acs2021_couples$educ_diff <- acs2021_couples$educ_numeric - acs2021_couples$h_educ_numeric
+
+acs2021_couples$RACE <- fct_recode(as.factor(acs2021_couples$RACE),
+                                      "White" = "1",
+                                      "Black" = "2",
+                                      "American Indian or Alaska Native" = "3",
+                                      "Chinese" = "4",
+                                      "Japanese" = "5",
+                                      "Other Asian or Pacific Islander" = "6",
+                                      "Other race" = "7",
+                                      "two races" = "8",
+                                      "three races" = "9")
+                                      
+acs2021_couples$h_race <- fct_recode(as.factor(acs2021_couples$h_race),
+                                   "White" = "1",
+                                   "Black" = "2",
+                                   "American Indian or Alaska Native" = "3",
+                                   "Chinese" = "4",
+                                   "Japanese" = "5",
+                                   "Other Asian or Pacific Islander" = "6",
+                                   "Other race" = "7",
+                                   "two races" = "8",
+                                   "three races" = "9")
+
+acs2021_couples$HISPAN <- fct_recode(as.factor(acs2021_couples$HISPAN),
+                                     "Not Hispanic" = "0",
+                                     "Mexican" = "1",
+                                     "Puerto Rican" = "2",
+                                     "Cuban" = "3",
+                                     "Other" = "4")
+acs2021_couples$h_hispan <- fct_recode(as.factor(acs2021_couples$h_hispan),
+                                     "Not Hispanic" = "0",
+                                     "Mexican" = "1",
+                                     "Puerto Rican" = "2",
+                                     "Cuban" = "3",
+                                     "Other" = "4")
+
+trad_data <- acs2021_couples %>% filter( (SEX == "Female") & (h_sex == "Male") )
+
+trad_data$he_more_than_5yrs_than_her <- as.numeric(trad_data$age_diff < -5)
 
 
 ```
 
-(Actually that's kinda nice exam question!) Please convince yourself (and explain) that the model predictions for different people are identical in the big equation with full interactions or the subsets. The big model with full interactions is tougher to interpret although it does provide easy access to hypothesis tests about the split (are the coefficients on age statistically different, for males or females?).
+This was the linear model from last time; now I've shown the table of predicted values.
 
-The point is that sometimes you might want to split the data into even smaller subsets, in order to run the model without crashing or taking hours. Your own computer has its limitations and you need to learn how to work around those. It's useful for future work -- many problems have vast amounts of data that need to be trimmed down. (There's a whole segment of data scientists who don't worry about their data size since they just splash it all onto AWS and then complain about how much they're paying AWS.)
+```{r}
+ols_out1 <- lm(he_more_than_5yrs_than_her ~ educ_hs + educ_somecoll + educ_college + educ_advdeg + AGE, data = trad_data)
 
-A word of caution: just because a particular technique works better or worse on this particular dataset does *not* mean that it's always better or worse. Just in this particular case for these particular data.
+pred_vals_ols1 <- predict(ols_out1, trad_data)
+pred_model_ols1 <- (pred_vals_ols1 > mean(pred_vals_ols1))
+table(pred = pred_model_ols1, true = trad_data$he_more_than_5yrs_than_her)
 
-One thing that we keep coming back to, in this class, is that there is both art and science to data analytics. The methods look so mathy and technical and have imposing names but there is quite a lot of personal artistry in how to use them. There is good and bad to the artistry (and also generally accepted vs unusual) but I want you to remember that fancy estimations don't guarantee correct results.
-
-Sometimes it can be useful to try these techniques in sequence. Some are good at wringing out every drop of juice for prediction; others are good at selecting which variables don't give enough juice to be worth the squeeze. You might find some of your X-variables that are consistently not selected as useful for prediction.
-
-In previous lab, you'd set a subsample and figured a set of X variables that are plausibly causal. You made choices about how to deal with NA values. You created this thing, `sobj <- standardize(y ~ X1 + X2 ...)` where you had choices for X variables and filled in the `...` part. You estimated OLS and logit and created confusion matrix for each, and checked predicted values overall and for subgroups.
-
-Now let's estimate some fancier models.
-
-Here is code for a Random Forest, which takes a bit of computing (especially if you include 144 PUMA dummies!),
-```{r eval = FALSE}
-require('randomForest')
-set.seed(54321)
-model_randFor <- randomForest(as.factor(pub_work) ~ ., data = sobj$data, importance=TRUE, proximity=TRUE)
-print(model_randFor)
-round(importance(model_randFor),2)
-varImpPlot(model_randFor)
-# look at confusion matrix for this too
-pred_model1 <- predict(model_randFor,  s_dat_test)
-table(pred = pred_model1, true = dat_test$pub_work)
-```
-Note that the estimation prints out a Confusion Matrix first but that's within the training data; the later one calculates how well it does on the test data.
-
-Next is Support Vector Machines. First it tries to find optimal tuning parameter, next uses those optimal values to train. (Tuning takes a long time so skip for now!)
-```{r eval = FALSE}
-require(e1071)
-# tuned_parameters <- tune.svm(as.factor(pub_work) ~ ., data = sobj$data, gamma = 10^(-3:0), cost = 10^(-2:2)) 
-# summary(tuned_parameters)
-# figure best parameters and input into next
-svm.model <- svm(as.factor(pub_work) ~ ., data = sobj$data, cost = 1, gamma = 0.1)
-svm.pred <- predict(svm.model, s_dat_test)
-table(pred = svm.pred, true = dat_test$pub_work)
 
 ```
 
-When you summarize, you should be able to explain which models predict best (noting if there is a tradeoff of false positive vs false negative) and if there are certain explanatory variables that are consistently more or less useful. Also try other lists of explanatory variables.
+```{r}
+model_logit1 <- glm(he_more_than_5yrs_than_her ~ educ_hs + educ_somecoll + educ_college + educ_advdeg + AGE, data = trad_data, family = binomial)
+summary(model_logit1)
+pred_vals <- predict(model_logit1, trad_data, type = "response")
+pred_model_logit1 <- (pred_vals > mean(pred_vals))
+table(pred = pred_model_logit1, true = trad_data$he_more_than_5yrs_than_her)
 
-Explain carefully about what is the marginal product of each of these methods. Old-fashioned OLS and logit give some predictions -- are these other methods better overall or in particular cases? Do they tend to make the same sort of errors or different ones? (If different then perhaps you can create an ensemble of models?)
+```
+
+You can play around to see if the `predvals > mean` cutoff is best or use ` > 0.5` or some other value. These give a table about how the models predict.
+
+And make sure to give me some better output, it's time to stop dumping all your output into one file but instead get thoughtful about presenting results.
+
