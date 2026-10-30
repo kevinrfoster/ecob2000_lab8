@@ -5,7 +5,7 @@ Lab 8
 
 ### Kevin R Foster, the Colin Powell School at the City College of New York, CUNY
 
-### Fall 2025
+### Fall 2026
 
 This is Part 2 of a 3-part series. Part 1 estimated OLS. Part 2 will
 estimate logit models; Part 3 will estimate fancier machine learning
